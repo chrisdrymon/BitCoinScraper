@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Net.Http;
 using HtmlAgilityPack;
 
-namespace Test
+namespace BitCoinScraper
 {
     class Program
     {
@@ -17,22 +17,25 @@ namespace Test
             Console.WriteLine("This is the original URL:");
             Console.WriteLine(originalURL);
             Console.WriteLine("");
+
+            // Start the httpclient for Google and the webclient for Forbes
             var httpClient = new HttpClient();
+            WebClientExtended client = new WebClientExtended();
 
             // Alter URL to receive more pages and their links.
-            for (int i = 1; i < 5; i++)
+            for (int i = 1; i < 3; i++)
             {
                 int num = i * 10;
                 string stringNum = num.ToString();
                 string nextURL = originalURL.Replace("start=0&", String.Format("start={0}&", stringNum));
                 Console.WriteLine(String.Format("Article URLs for page {0}:", i));
-                await GetTargetLinksAsync(nextURL, httpClient);
+                await GetTargetLinksAsync(nextURL, httpClient, client);
                 Console.WriteLine("");
             }
             Console.ReadLine();
         }
 
-        private static async Task GetTargetLinksAsync(string thisurl, HttpClient httpSession)
+        private static async Task GetTargetLinksAsync(string thisurl, HttpClient httpSession, WebClientExtended oclient)
         {
             var html = await httpSession.GetStringAsync(thisurl);
 
@@ -44,8 +47,21 @@ namespace Test
                 {
                     int stopNum = child.GetAttributeValue("href", "").IndexOf('&');
                     string articleURL = child.GetAttributeValue("href", "").Substring(7, stopNum - 7);
-                    Console.WriteLine(articleURL);
+                    Console.WriteLine(String.Format("{0} {1}", articleURL.Length, articleURL));
+                    GetArticleInfo(articleURL, oclient);
                 }
+            }
+        }
+        private static void GetArticleInfo(string arturl, WebClientExtended headerclient)
+        {
+            var articleDoc = new HtmlDocument();
+            articleDoc.LoadHtml(System.Text.Encoding.UTF8.GetString(headerclient.DownloadData(arturl)));
+            
+            // This writes out the title of the Forbes article
+            var nodes = articleDoc.DocumentNode.SelectNodes("//title");
+            foreach (var node in nodes)
+            {
+                Console.WriteLine(node.InnerText);
             }
         }
     }
