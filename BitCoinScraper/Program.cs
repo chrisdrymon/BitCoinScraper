@@ -23,7 +23,7 @@ namespace BitCoinScraper
             WebClientExtended client = new WebClientExtended();
 
             // Alter URL to receive more pages and their links.
-            for (int i = 1; i < 3; i++)
+            for (int i = 1; i < 2; i++)
             {
                 int num = i * 10;
                 string stringNum = num.ToString();
@@ -57,12 +57,25 @@ namespace BitCoinScraper
             var articleDoc = new HtmlDocument();
             articleDoc.LoadHtml(System.Text.Encoding.UTF8.GetString(headerclient.DownloadData(arturl)));
             
-            // This writes out the title of the Forbes article
-            var nodes = articleDoc.DocumentNode.SelectNodes("//title");
-            foreach (var node in nodes)
+            // This writes out the title of the article
+            var title = articleDoc.DocumentNode.SelectSingleNode("//title");
+            Console.WriteLine(title.InnerText);
+            var times = articleDoc.DocumentNode.SelectNodes("//time");
+            Console.WriteLine(String.Format("Publish Date: {0}", times[0].InnerText.Remove(times[0].InnerText.Length-1, 1)));
+            Console.WriteLine(String.Format("Publish Time: {0}", times[1].InnerText));
+            var author = articleDoc.DocumentNode.SelectSingleNode("//meta[@name='author']").GetAttributeValue("Content", "No Author");
+            Console.WriteLine(String.Format("Author: {0}", author));
+            var figs = articleDoc.DocumentNode.SelectSingleNode("//figure");
+            figs.Remove();
+            var paragraphs = articleDoc.DocumentNode.SelectNodes("//div[@class='article-body fs-article fs-responsive-text current-article']//p");
+            string articletext = "";
+            foreach (var paragraph in paragraphs)
             {
-                Console.WriteLine(node.InnerText);
+                articletext = string.Concat(articletext, paragraph.InnerText);
+                //articletext = articletext + paragraph;
+                //<div class="article-body">
             }
+            Console.WriteLine(articletext);
         }
     }
 }
