@@ -12,21 +12,24 @@ namespace BitCoinScraper
     class DataAccess
     {
         private static string constring = ConfigurationManager.ConnectionStrings["BCArticles"].ConnectionString;
-        public static void InsertRow()
+        public static void InsertRow(string date, string time, int unixtime, string url, string title, string author, string text)
         {
-            List<string> roles = new List<string>();
             using (SqlConnection conn = new SqlConnection(constring))
             {
-                using (SqlCommand cmd = new SqlCommand("GetUserRoles", conn))
+                using (SqlCommand cmd = new SqlCommand("InsertRow", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@userid", userid);
+                    cmd.Parameters.AddWithValue("@date", date);
+                    cmd.Parameters.AddWithValue("@time", time);
+                    cmd.Parameters.AddWithValue("@unixtime", unixtime);
+                    cmd.Parameters.AddWithValue("@url", url);
+                    cmd.Parameters.AddWithValue("@title", title);
+                    cmd.Parameters.AddWithValue("@author", author);
+                    cmd.Parameters.AddWithValue("@text", text);
                     conn.Open();
-                    SqlDataReader rdr = cmd.ExecuteReader();
-                    while (rdr.Read())
-                    {
-                        roles.Add(rdr["roletitle"].ToString());
-                    }
+                    int result = cmd.ExecuteNonQuery();
+                    if (result < 0)
+                        Console.WriteLine("Error inserting data into Database!");
                 }
             }
         }
