@@ -12,7 +12,7 @@ namespace BitCoinScraper
     class DataAccess
     {
         private static string constring = ConfigurationManager.ConnectionStrings["BCArticles"].ConnectionString;
-        public static void InsertRow(string date, string time, int unixtime, string url, string title, string author, string text)
+        public static void InsertRow(string date, string time, long unixtime, string url, string title, string author, string text)
         {
             using (SqlConnection conn = new SqlConnection(constring))
             {

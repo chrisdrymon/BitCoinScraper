@@ -38,7 +38,6 @@ namespace BitCoinScraper
             }
             Console.ReadLine();
         }
-
         private static async Task GetTargetLinksAsync(string thisurl, HttpClient httpSession, WebClientExtended oclient, Hashtable tzabbrevs)
         {
             var html = await httpSession.GetStringAsync(thisurl);
@@ -62,8 +61,9 @@ namespace BitCoinScraper
             articleDoc.LoadHtml(System.Text.Encoding.UTF8.GetString(headerclient.DownloadData(arturl)));
             
             // This writes out the title of the article
-            var title = articleDoc.DocumentNode.SelectSingleNode("//title");
-            Console.WriteLine(title.InnerText);
+            var titlenode = articleDoc.DocumentNode.SelectSingleNode("//title");
+            string title = titlenode.InnerText;
+            Console.WriteLine(title);
 
             //Finds article's time info and also converts it to unixtime
             var times = articleDoc.DocumentNode.SelectNodes("//time");
@@ -94,7 +94,7 @@ namespace BitCoinScraper
                 //<div class="article-body">
             }
 
-            //DataAccess.InsertRow(times[0], times[1], unixtime, arturl, title, author, articletext);
+            DataAccess.InsertRow(date, time, unixtime, arturl, title, author, articletext);
             Console.WriteLine(articletext);
         }
         static Hashtable GetTimeZoneAbbreviationLookup()
