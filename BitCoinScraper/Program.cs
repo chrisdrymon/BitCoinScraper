@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Net.Http;
 using HtmlAgilityPack;
+using System.Threading;
 
 namespace BitCoinScraper
 {
@@ -14,7 +15,8 @@ namespace BitCoinScraper
         static async Task Main(string[] args)
         {
             // This is the URL of a Google Search.
-            string originalURL = "https://www.google.com/search?q=bitcoin+site:forbes.com&sxsrf=ALeKk00hRJnxNYQ2jMNZJtSsMFszejMH5Q:1587155620466&ei=pBKaXqaKHNvKtQbUvbmICg&start=0&sa=N&ved=2ahUKEwim7Ne3p_DoAhVbZc0KHdReDqEQ8tMDegQIEhAt&biw=1707&bih=931";
+            string originalURL = "https://www.google.com/search?q=bitcoin+site:forbes.com&sxsrf=ALeKk012X-Xh0ptU3urcC7QGUOuFlbyjxg:1587768296193&ei=6GujXqu3C4KrtQab4p_gCA&start=0&sa=N&ved=2ahUKEwiry57qkYLpAhWCVc0KHRvxB4wQ8NMDegQIDBA_&biw=1707&bih=931";
+            // https://www.google.com/search?q=bitcoin+site%3Aforbes.com&sxsrf=ALeKk00MMjTPLImcWJYx9TdUgTNljpm32Q%3A1588001983722&source=lnt&tbs=cdr%3A1%2Ccd_min%3A1%2F1%2F2015%2Ccd_max%3A2%2F1%2F2015&tbm=
             Console.WriteLine("This is the original URL:");
             Console.WriteLine(originalURL);
             Console.WriteLine("");
@@ -27,12 +29,12 @@ namespace BitCoinScraper
             Hashtable tzabbrevs = GetTimeZoneAbbreviationLookup();
 
             // Alter URL to receive more pages and their links. [Note to self: Before finishing, turn this into a while loop.]
-            for (int i = 1; i < 2; i++)
+            for (int i = 37; i < 800; i++)
             {
-                int num = i * 10;
+                int num = (i-1) * 10;
                 string stringNum = num.ToString();
                 string nextURL = originalURL.Replace("start=0&", String.Format("start={0}&", stringNum));
-                Console.WriteLine(String.Format("Article URLs for page {0}:", i));
+                Console.WriteLine(String.Format("Articles from Search Page {0}:", i));
                 await GetTargetLinksAsync(nextURL, httpClient, client, tzabbrevs);
                 Console.WriteLine("");
             }
@@ -67,35 +69,40 @@ namespace BitCoinScraper
 
             //Finds article's time info and also converts it to unixtime
             var times = articleDoc.DocumentNode.SelectNodes("//time");
-            string date = times[0].InnerText.Remove(times[0].InnerText.Length - 1, 1);
-            string time = times[1].InnerText;
-            string timestring = date + ", " + time;
-            Console.WriteLine(String.Format("Publish Date: {0}", timestring));
-            string tz = timestring.Substring(timestring.Length - 3);
-            string newtz = tzabbrevs[tz].ToString();
-            string newdate = timestring.Remove(timestring.Length - 3) + newtz;
-            DateTime dtversion = DateTime.Parse(newdate);
-            long unixtime = ((DateTimeOffset)dtversion).ToUnixTimeSeconds();
-            Console.WriteLine(String.Format("Publish Unix Time: {0}", unixtime)); //1586108400
-
-            //This gets the article's author
-            var author = articleDoc.DocumentNode.SelectSingleNode("//meta[@name='author']").GetAttributeValue("Content", "No Author");
-            Console.WriteLine(String.Format("Author: {0}", author));
-
-            //Removes unwanted paragraphs and returns text
-            var figs = articleDoc.DocumentNode.SelectSingleNode("//figure");
-            figs.Remove();
-            var paragraphs = articleDoc.DocumentNode.SelectNodes("//div[@class='article-body fs-article fs-responsive-text current-article']//p");
-            string articletext = "";
-            foreach (var paragraph in paragraphs)
+            if (times != null)
             {
-                articletext = string.Concat(articletext, paragraph.InnerText);
-                //articletext = articletext + paragraph;
-                //<div class="article-body">
-            }
+                string date = times[0].InnerText.Remove(times[0].InnerText.Length - 1, 1);
+                string time = times[1].InnerText;
+                string timestring = date + ", " + time;
+                Console.WriteLine(String.Format("Publish Date: {0}", timestring));
+                string tz = timestring.Substring(timestring.Length - 3);
+                string newtz = tzabbrevs[tz].ToString();
+                string newdate = timestring.Remove(timestring.Length - 3) + newtz;
+                DateTime dtversion = DateTime.Parse(newdate);
+                long unixtime = ((DateTimeOffset)dtversion).ToUnixTimeSeconds();
+                //Console.WriteLine(String.Format("Publish Unix Time: {0}", unixtime));
 
-            DataAccess.InsertRow(date, time, unixtime, arturl, title, author, articletext);
-            Console.WriteLine(articletext);
+                //This gets the article's author
+                var author = articleDoc.DocumentNode.SelectSingleNode("//meta[@name='author']").GetAttributeValue("Content", "No Author");
+                //Console.WriteLine(String.Format("Author: {0}", author));
+
+                //Removes unwanted paragraphs and returns text
+                var figs = articleDoc.DocumentNode.SelectSingleNode("//figure");
+                if (figs != null)
+                {
+                    figs.Remove();
+                }
+
+                var paragraphs = articleDoc.DocumentNode.SelectNodes("//div[starts-with(@class, 'article-body ')]//p");
+                string articletext = "";
+
+                foreach (var paragraph in paragraphs)
+                {
+                    articletext = string.Concat(articletext, paragraph.InnerText);
+                }
+                DataAccess.InsertRow(date, time, unixtime, arturl, title, author, articletext);
+                Thread.Sleep(2000);
+            }
         }
         static Hashtable GetTimeZoneAbbreviationLookup()
         {

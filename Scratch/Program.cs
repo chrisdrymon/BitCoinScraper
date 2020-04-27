@@ -14,7 +14,7 @@ namespace Scratch
         {
             // This is the URL of a Forbes Article.
             WebClientExtended client = new WebClientExtended();
-            string originalURL = "https://www.forbes.com/sites/billybambrough/2020/04/18/its-make-or-break-for-bitcoin/";
+            string originalURL = "https://www.forbes.com/sites/michaeldelcastillo/2020/04/01/a-bitcoin-bastion-for-the-wild-west/";
             //var httpClient = new HttpClient();
             //var html = await httpClient.GetStringAsync(originalURL);
             var htmlDocument = new HtmlDocument();
