@@ -16,7 +16,6 @@ namespace BitCoinScraper
         static async Task Main(string[] args)
         {
             // This is the URL of a Google Search.
-            //string originalURL = "https://www.google.com/search?q=bitcoin+site:forbes.com&tbs=cdr:1,cd_min:1/1/2015,cd_max:2/1/2015&sxsrf=ALeKk00AVXzW5sUWvBIyqo2Lqq22jrswFg:1588002643088&ei=U_-mXo3uBIOotQXegK6gDw&start=0&sa=N&ved=2ahUKEwjN48Xr-ojpAhUDVK0KHV6AC_QQ8NMDegQICxAz&biw=1707&bih=931";
             string originalURL = "https://www.google.com/search?q=bitcoin+site:forbes.com&tbs=cdr:1,cd_min:1/1/2016,cd_max:2/1/2016&sxsrf=ALeKk024LulKuHDl6svGxyr5qSBaa-hThA:1588108834118&ei=Ip6oXtXaBpTWtAbHzrbwAQ&start=0&sa=N&ved=2ahUKEwjV86-3hozpAhUUK80KHUenDR4Q8NMDegQIDBAx&biw=1707&bih=931";
             Console.WriteLine("This is the original URL:");
             Console.WriteLine(originalURL);
@@ -29,19 +28,15 @@ namespace BitCoinScraper
             handler.CookieContainer = cookies;
             handler.UseCookies = true;
             var httpClient = new HttpClient(handler);
+
             // I found this to be a simpler User Agent
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko");
-            //var html = await httpClient.GetStringAsync(originalURL);
-            //htmlDocument.LoadHtml(html);
-
-            // Start the WebClient for Forbes
-            // WebClientExtended client = new WebClientExtended();
 
             // Creates a hash table that will be used later to convert time zones
             Hashtable tzabbrevs = GetTimeZoneAbbreviationLookup();
 
             // Alter URL to receive more pages and their links.
-            // I got to Articles for 1/11/2017 to 2/11/2017 before being blocked.
+            // I got to 1/11/2017 to 2/11/2017 before being blocked by Forbes.
             DateTime start = new DateTime(2017, 1, 11);
             DateTime end = start.AddMonths(1);
             while (start.Year < 2020)
@@ -96,7 +91,8 @@ namespace BitCoinScraper
                     }
                     catch (Exception)
                     {
-                        Console.WriteLine("A 404.");
+                        Console.WriteLine("A 404?");
+                        throw;
                     }
                 }
             }
@@ -112,6 +108,7 @@ namespace BitCoinScraper
         }
         private static async Task GetArticleInfo(string arturl, HttpClient headerclient, Hashtable tzabbrevs)
         {
+            // Create the HTML Document
             var articleDoc = new HtmlDocument();
             var arthtml = await headerclient.GetStringAsync(arturl);
             articleDoc.LoadHtml(arthtml);
@@ -121,10 +118,11 @@ namespace BitCoinScraper
             string title = titlenode.InnerText;
             Console.WriteLine(title);
 
-            //Finds article's time info; also converts it to unixtime
+            // Select the appropriate nodes. If no time node exists, skip the article.
             var times = articleDoc.DocumentNode.SelectNodes("//time");
             if (times != null)
             {
+                // Finds article's time info; also converts it to unixtime
                 string date = times[0].InnerText.Remove(times[0].InnerText.Length - 1, 1);
                 string time = times[1].InnerText;
                 string timestring = date + ", " + time;
@@ -134,12 +132,11 @@ namespace BitCoinScraper
                 string newdate = timestring.Remove(timestring.Length - 3) + newtz;
                 DateTime dtversion = DateTime.Parse(newdate);
                 long unixtime = ((DateTimeOffset)dtversion).ToUnixTimeSeconds();
-                //Console.WriteLine(String.Format("Publish Unix Time: {0}", unixtime));
 
-                //This gets the article's author
+                // Get the article's author
                 var author = articleDoc.DocumentNode.SelectSingleNode("//meta[@name='author']").GetAttributeValue("Content", "No Author");
 
-                //Removes unwanted paragraphs and returns text
+                // Removes unwanted paragraphs and returns article text
                 var figs = articleDoc.DocumentNode.SelectSingleNode("//figure");
                 if (figs != null)
                 {
@@ -153,10 +150,16 @@ namespace BitCoinScraper
                 {
                     articletext = string.Concat(articletext, paragraph.InnerText);
                 }
+
+                // Insert data into database
                 DataAccess.InsertRow(date, time, unixtime, arturl, title, author, articletext);
-                Thread.Sleep(3000);
+
+                // Pause between each article download. A 3 second delay still got me banned for a while. We'll try 10 seconds.
+                Thread.Sleep(10000);
             }
         }
+
+        // Create a hashtable to convert timezone abbreviations to UTC time
         static Hashtable GetTimeZoneAbbreviationLookup()
         {
             Hashtable hashtable = new Hashtable();
