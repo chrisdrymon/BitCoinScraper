@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Net.Http;
 using HtmlAgilityPack;
 using System.Threading;
+using System.Net;
 
 namespace BitCoinScraper
 {
@@ -15,59 +16,112 @@ namespace BitCoinScraper
         static async Task Main(string[] args)
         {
             // This is the URL of a Google Search.
-            string originalURL = "https://www.google.com/search?q=bitcoin+site:forbes.com&sxsrf=ALeKk012X-Xh0ptU3urcC7QGUOuFlbyjxg:1587768296193&ei=6GujXqu3C4KrtQab4p_gCA&start=0&sa=N&ved=2ahUKEwiry57qkYLpAhWCVc0KHRvxB4wQ8NMDegQIDBA_&biw=1707&bih=931";
-            // https://www.google.com/search?q=bitcoin+site%3Aforbes.com&sxsrf=ALeKk00MMjTPLImcWJYx9TdUgTNljpm32Q%3A1588001983722&source=lnt&tbs=cdr%3A1%2Ccd_min%3A1%2F1%2F2015%2Ccd_max%3A2%2F1%2F2015&tbm=
+            //string originalURL = "https://www.google.com/search?q=bitcoin+site:forbes.com&tbs=cdr:1,cd_min:1/1/2015,cd_max:2/1/2015&sxsrf=ALeKk00AVXzW5sUWvBIyqo2Lqq22jrswFg:1588002643088&ei=U_-mXo3uBIOotQXegK6gDw&start=0&sa=N&ved=2ahUKEwjN48Xr-ojpAhUDVK0KHV6AC_QQ8NMDegQICxAz&biw=1707&bih=931";
+            string originalURL = "https://www.google.com/search?q=bitcoin+site:forbes.com&tbs=cdr:1,cd_min:1/1/2016,cd_max:2/1/2016&sxsrf=ALeKk024LulKuHDl6svGxyr5qSBaa-hThA:1588108834118&ei=Ip6oXtXaBpTWtAbHzrbwAQ&start=0&sa=N&ved=2ahUKEwjV86-3hozpAhUUK80KHUenDR4Q8NMDegQIDBAx&biw=1707&bih=931";
             Console.WriteLine("This is the original URL:");
             Console.WriteLine(originalURL);
             Console.WriteLine("");
 
-            // Start the httpclient for Google and the webclient for Forbes
-            var httpClient = new HttpClient();
-            WebClientExtended client = new WebClientExtended();
+            // Start the httpclient for Google
+            HtmlDocument htmlDocument = new HtmlDocument();
+            HttpClientHandler handler = new HttpClientHandler();
+            CookieContainer cookies = new CookieContainer();
+            handler.CookieContainer = cookies;
+            handler.UseCookies = true;
+            var httpClient = new HttpClient(handler);
+            // I found this to be a simpler User Agent
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko");
+            //var html = await httpClient.GetStringAsync(originalURL);
+            //htmlDocument.LoadHtml(html);
+
+            // Start the WebClient for Forbes
+            // WebClientExtended client = new WebClientExtended();
 
             // Creates a hash table that will be used later to convert time zones
             Hashtable tzabbrevs = GetTimeZoneAbbreviationLookup();
 
-            // Alter URL to receive more pages and their links. [Note to self: Before finishing, turn this into a while loop.]
-            for (int i = 37; i < 800; i++)
+            // Alter URL to receive more pages and their links.
+            // I got to Articles for 1/11/2017 to 2/11/2017 before being blocked.
+            DateTime start = new DateTime(2017, 1, 11);
+            DateTime end = start.AddMonths(1);
+            while (start.Year < 2020)
             {
-                int num = (i-1) * 10;
-                string stringNum = num.ToString();
-                string nextURL = originalURL.Replace("start=0&", String.Format("start={0}&", stringNum));
-                Console.WriteLine(String.Format("Articles from Search Page {0}:", i));
-                await GetTargetLinksAsync(nextURL, httpClient, client, tzabbrevs);
-                Console.WriteLine("");
+                string startdate = String.Format("{0}/{1}/{2}", start.Month, start.Day, start.Year);
+                string enddate = String.Format("{0}/{1}/{2}", end.Month, end.Day, end.Year);
+                string startURL = originalURL.Replace("min:1/1/2016", String.Format("min:{0}", startdate));
+                string endURL = startURL.Replace("max:2/1/2016", String.Format("max:{0}", enddate));
+                Console.WriteLine(String.Format("Articles for {0} to {1}", startdate, enddate));
+
+                // For each date, get all the pages of results
+                bool more = true;
+                int i = 1;
+                while (more)
+                {
+                    int num = (i - 1) * 10;
+                    string stringNum = num.ToString();
+                    string nextURL = endURL.Replace("start=0&", String.Format("start={0}&", stringNum));
+                    Console.WriteLine(String.Format("Articles from Search Page {0}:", i));
+                    more = await GetTargetLinksAsync(nextURL, httpClient, tzabbrevs);
+                    Console.WriteLine("");
+                    //Console.ReadLine();
+                    i++;
+                }
+                start = end.AddDays(1);
+                end = start.AddMonths(1);
             }
             Console.ReadLine();
         }
-        private static async Task GetTargetLinksAsync(string thisurl, HttpClient httpSession, WebClientExtended oclient, Hashtable tzabbrevs)
+        private static async Task<bool> GetTargetLinksAsync(string thisurl, HttpClient httpSession, Hashtable tzabbrevs)
         {
             var html = await httpSession.GetStringAsync(thisurl);
-
             var htmlDocument = new HtmlDocument();
             htmlDocument.LoadHtml(html);
+
+            // Remove unwanted links
+            foreach (var child in htmlDocument.DocumentNode.SelectNodes("//a[@class='fl']"))
+            {
+                child.Remove();
+            }
+
+            // Get the correct links and get the articles
             foreach (var child in htmlDocument.DocumentNode.Descendants("a"))
             {
-                if (child.GetAttributeValue("href", "no hyperlinks").StartsWith("/url?q=https://www.forbes.com/sites"))
+                if (child.GetAttributeValue("href", "no hyperlinks").StartsWith("https://www.forbes.com/sites"))
                 {
-                    int stopNum = child.GetAttributeValue("href", "").IndexOf('&');
-                    string articleURL = child.GetAttributeValue("href", "").Substring(7, stopNum - 7);
-                    Console.WriteLine(String.Format("{0} {1}", articleURL.Length, articleURL));
-                    GetArticleInfo(articleURL, oclient, tzabbrevs);
+                    string articleURL = child.GetAttributeValue("href", "");
+                    Console.WriteLine(articleURL);
+                    try
+                    {
+                        await GetArticleInfo(articleURL, httpSession, tzabbrevs);
+                    }
+                    catch (Exception)
+                    {
+                        Console.WriteLine("A 404.");
+                    }
                 }
             }
+
+            // This decides whether or not there are more links from the current date range.
+            bool keepgoing = true;
+            if (htmlDocument.DocumentNode.SelectSingleNode("//a[@id='pnnext']") == null)
+            {
+                keepgoing = false;
+            }
+
+            return(keepgoing);
         }
-        private static void GetArticleInfo(string arturl, WebClientExtended headerclient, Hashtable tzabbrevs)
+        private static async Task GetArticleInfo(string arturl, HttpClient headerclient, Hashtable tzabbrevs)
         {
             var articleDoc = new HtmlDocument();
-            articleDoc.LoadHtml(System.Text.Encoding.UTF8.GetString(headerclient.DownloadData(arturl)));
+            var arthtml = await headerclient.GetStringAsync(arturl);
+            articleDoc.LoadHtml(arthtml);
             
             // This writes out the title of the article
             var titlenode = articleDoc.DocumentNode.SelectSingleNode("//title");
             string title = titlenode.InnerText;
             Console.WriteLine(title);
 
-            //Finds article's time info and also converts it to unixtime
+            //Finds article's time info; also converts it to unixtime
             var times = articleDoc.DocumentNode.SelectNodes("//time");
             if (times != null)
             {
@@ -84,7 +138,6 @@ namespace BitCoinScraper
 
                 //This gets the article's author
                 var author = articleDoc.DocumentNode.SelectSingleNode("//meta[@name='author']").GetAttributeValue("Content", "No Author");
-                //Console.WriteLine(String.Format("Author: {0}", author));
 
                 //Removes unwanted paragraphs and returns text
                 var figs = articleDoc.DocumentNode.SelectSingleNode("//figure");
@@ -101,7 +154,7 @@ namespace BitCoinScraper
                     articletext = string.Concat(articletext, paragraph.InnerText);
                 }
                 DataAccess.InsertRow(date, time, unixtime, arturl, title, author, articletext);
-                Thread.Sleep(2000);
+                Thread.Sleep(3000);
             }
         }
         static Hashtable GetTimeZoneAbbreviationLookup()
