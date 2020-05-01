@@ -36,16 +36,16 @@ namespace BitCoinScraper
             Hashtable tzabbrevs = GetTimeZoneAbbreviationLookup();
 
             // Alter URL to receive more pages and their links.
-            // I got to 1/11/2017 to 2/11/2017 before being blocked by Forbes.
-            DateTime start = new DateTime(2017, 1, 11);
+            DateTime start = new DateTime(2012, 3, 15);
             DateTime end = start.AddMonths(1);
-            while (start.Year < 2020)
+            while (start.Year < 2013)
             {
                 string startdate = String.Format("{0}/{1}/{2}", start.Month, start.Day, start.Year);
                 string enddate = String.Format("{0}/{1}/{2}", end.Month, end.Day, end.Year);
                 string startURL = originalURL.Replace("min:1/1/2016", String.Format("min:{0}", startdate));
                 string endURL = startURL.Replace("max:2/1/2016", String.Format("max:{0}", enddate));
                 Console.WriteLine(String.Format("Articles for {0} to {1}", startdate, enddate));
+                Console.WriteLine(String.Format("Search URL: {0}", endURL));
 
                 // For each date, get all the pages of results
                 bool more = true;
@@ -56,14 +56,23 @@ namespace BitCoinScraper
                     string stringNum = num.ToString();
                     string nextURL = endURL.Replace("start=0&", String.Format("start={0}&", stringNum));
                     Console.WriteLine(String.Format("Articles from Search Page {0}:", i));
-                    more = await GetTargetLinksAsync(nextURL, httpClient, tzabbrevs);
-                    Console.WriteLine("");
-                    //Console.ReadLine();
+                    try
+                    {
+                        more = await GetTargetLinksAsync(nextURL, httpClient, tzabbrevs);
+                        Console.WriteLine("");
+                    }
+                    catch (Exception)
+                    {
+                        Console.WriteLine("This searched returned no results.");
+                        more = false;
+                    }
+
                     i++;
                 }
                 start = end.AddDays(1);
                 end = start.AddMonths(1);
             }
+            Console.WriteLine("Finished!");
             Console.ReadLine();
         }
         private static async Task<bool> GetTargetLinksAsync(string thisurl, HttpClient httpSession, Hashtable tzabbrevs)
@@ -78,10 +87,10 @@ namespace BitCoinScraper
                 child.Remove();
             }
 
-            // Get the correct links and get the articles
+            // Get the correct links, get the articles, avoid 404 pages
             foreach (var child in htmlDocument.DocumentNode.Descendants("a"))
             {
-                if (child.GetAttributeValue("href", "no hyperlinks").StartsWith("https://www.forbes.com/sites"))
+                if (child.GetAttributeValue("href", "no hyperlinks").StartsWith("https://www.forbes.com/sites") && !child.InnerText.StartsWith("404 - Forbes"))
                 {
                     string articleURL = child.GetAttributeValue("href", "");
                     Console.WriteLine(articleURL);
@@ -92,7 +101,6 @@ namespace BitCoinScraper
                     catch (Exception)
                     {
                         Console.WriteLine("A 404?");
-                        throw;
                     }
                 }
             }
